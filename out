@@ -23,7 +23,10 @@ then
     exit 0
 fi
 
-webhook_url="$(jq -r '.source.url' < "${payload}")"
+# webhook_url="$(jq -r '.source.url' < "${payload}")"
+# defaults to `chat.postMessage` url in case nothing's specified
+webhook_url="$(jq -r '.source.url // "https://slack.com/api/chat.postMessage"' < "${payload}")"
+oauth_token="$(jq -r '.source.token' < "${payload}")"
 allow_insecure="$(jq -r '.source.insecure // "false"' < "${payload}")"
 raw_ca_certs=$(jq -r '.source.ca_certs // []' < $payload)
 
@@ -59,6 +62,12 @@ if [ -f "$env_file" ]; then
 fi
 
 cert_count="$(echo $raw_ca_certs | jq -r '. | length')"
+
+if [[ -z "${oauth_token}" ]]; then
+  echo "Error: OAuth token not found."
+  exit 1
+fi
+
 if [[ ${cert_count} -gt 0 ]]
 then
   cert_dir="/usr/local/share/ca-certificates/"
@@ -163,13 +172,13 @@ EOF
   elif [[ "$silent" == "true" ]]
   then
     echo "Using silent output"
-    curl -s -X POST -T /tmp/compact_body.json ${CURL_OPTION} "${webhook_url}"
+    curl -s -X POST -H 'Content-type: application/json' -H "Authorization: Bearer ${oauth_token}" -T /tmp/compact_body.json ${CURL_OPTION} "${webhook_url}"
   elif [[ ${redact_hook} == "true" ]]
   then
     url_path="$(echo ${webhook_url} | sed -e "s/https\{0,1\}:\/\/[^\/]*\(\/[^?&#]*\).*/\1/")"
-    curl -v -X POST -T /tmp/compact_body.json ${CURL_OPTION} "${webhook_url}" 2>&1 | sed -e "s#${url_path}#***WEBHOOK URL REDACTED***#g"
+    curl -v -X POST -H 'Content-type: application/json' -H "Authorization: Bearer ${oauth_token}" -T /tmp/compact_body.json ${CURL_OPTION} "${webhook_url}" 2>&1 | sed -e "s#${url_path}#***WEBHOOK URL REDACTED***#g"
   else
-    curl -v -X POST -T /tmp/compact_body.json ${CURL_OPTION} "${webhook_url}" | sed -e "s#${url_path}#***WEBHOOK URL REDACTED***#g"
+    curl -v -X POST -H 'Content-type: application/json' -H "Authorization: Bearer ${oauth_token}" -T /tmp/compact_body.json ${CURL_OPTION} "${webhook_url}" | sed -e "s#${url_path}#***WEBHOOK URL REDACTED***#g"
   fi
 else
   text_interplated="$(echo "" | jq -R -s .)"

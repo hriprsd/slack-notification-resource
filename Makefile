@@ -1,5 +1,5 @@
-IMAGE   ?= cfcommunity/slack-notification-resource
-VERSION ?= dev
+IMAGE   ?= hub.comcast.net/sepulse/slack-notifications
+VERSION ?= latest
 
 build:
 	docker build \
